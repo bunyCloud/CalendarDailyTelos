@@ -1,20 +1,21 @@
 # Dev Log
 
-Contract Events
+## Solidity Contract Events
 
-EventUpdated: This event is emitted when an existing event is updated. It includes the updated event's ID, title, the address of the organizer, start time, end time, metadata URI, and the timestamp of when the update occurred.
+- **EventUpdated**: This event is emitted when an existing event is updated. It includes the updated event's ID, title, the address of the organizer, start time, end time, metadata URI, and the timestamp of when the update occurred.
 
-UserInvited: This event is emitted when a user is invited to an event. It includes the ID of the event to which the user is invited, the title of the event, and the address of the invited user.
+- **UserInvited**: This event is emitted when a user is invited to an event. It includes the ID of the event to which the user is invited, the title of the event, and the address of the invited user.
 
-InvitationAccepted: This event is emitted when a user accepts an invitation to an event. It includes the ID of the event, the address of the attendee who accepted the invitation.
+- **InvitationAccepted**: This event is emitted when a user accepts an invitation to an event. It includes the ID of the event, and the address of the attendee who accepted the invitation.
 
-AccountRoleGranted: This event is emitted when a role is granted to an account. It includes the role that was granted, the address of the account to which the role was granted, and the address of admin granting role. 
+- **AccountRoleGranted**: This event is emitted when a role is granted to an account. It includes the role that was granted, the address of the account to which the role was granted, and the address of admin granting role.
 
-NewEventCreated: This event is emitted when a new event is created. It includes the new event Id, title, organizer address, start time, end time, metadata URI, the timestamp of when the event was created, and the role of the creator.
+- **NewEventCreated**: This event is emitted when a new event is created. It includes the new event Id, title, organizer address, start time, end time, metadata URI, the timestamp of when the event was created, and the role of the creator.
 
-EventDeleted: This event is emitted when an event is deleted. It includes the ID of the event that was deleted and the address of the organizer who deleted the event.
+- **EventDeleted**: This event is emitted when an event is deleted. It includes the ID of the event that was deleted and the address of the organizer who deleted the event.
 
-indexed parameters for transaction filtering
+*Note:* The `indexed` keyword is used for parameters in these events to allow for more efficient filtering when these events are searched for in the Ethereum transaction log history.
+
 
 
 ## Constructor
