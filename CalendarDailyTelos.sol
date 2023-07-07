@@ -271,7 +271,7 @@ contract CalendarDailyTelos is AccessControl {
         emit EventUpdated(eventID, title, msg.sender, startTime, endTime, metadataURI, block.timestamp);
     }
 
-    function getAllAddressesByRole() public view returns (address[] memory, address[] memory, address[] memory) {
+    function getAllAddresses() public view returns (address[] memory, address[] memory, address[] memory) {
         uint adminCount = 0;
         uint memberCount = 0;
         uint guestCount = 0;
