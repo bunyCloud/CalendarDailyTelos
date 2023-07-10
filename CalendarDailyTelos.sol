@@ -4,7 +4,6 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract CalendarDailyTelos is AccessControl {
-    
     bytes32 public constant MEMBER_ROLE = keccak256("MEMBER_ROLE");
     bytes32 public constant GUEST_ROLE = keccak256("GUEST_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -43,6 +42,7 @@ contract CalendarDailyTelos is AccessControl {
     mapping(address => Guest) public guests;
     mapping(address => Member) public members;
     mapping(address => Admin) public admin;
+    mapping(uint => CalendarEvent) public eventsById;
     mapping(address => CalendarEvent[]) public userEvents;
     mapping(address => CalendarEvent[]) public guestEvents;
     mapping(address => CalendarEvent[]) public adminEvents;
@@ -154,6 +154,10 @@ contract CalendarDailyTelos is AccessControl {
         memberCount--;
     }
 
+    function getEventById(uint eventId) public view returns (CalendarEvent memory) {
+        return eventsById[eventId];
+    }
+
     function getAdminEvents(address adminAddress) public view onlyAdmin returns (CalendarEvent[] memory) {
         return adminEvents[adminAddress];
     }
@@ -165,6 +169,28 @@ contract CalendarDailyTelos is AccessControl {
     function getGuestEvents(address guestAddress) public view returns (CalendarEvent[] memory) {
         require(hasRole(GUEST_ROLE, guestAddress), "Caller is not a guest");
         return guestEvents[guestAddress];
+    }
+
+    function getAllEvents() public view returns (CalendarEvent[] memory) {
+        CalendarEvent[] memory memberEvents = getAllMemberEvents();
+        CalendarEvent[] memory guestEvents = getAllGuestEvents();
+        CalendarEvent[] memory adminEvents = getAllAdminEvents();
+        uint totalEvents = memberEvents.length + guestEvents.length + adminEvents.length;
+        CalendarEvent[] memory allEvents = new CalendarEvent[](totalEvents);
+        uint currentIndex = 0;
+        for (uint i = 0; i < memberEvents.length; i++) {
+                allEvents[currentIndex] = memberEvents[i];
+                currentIndex++;
+        }
+        for (uint i = 0; i < guestEvents.length; i++) {
+                allEvents[currentIndex] = guestEvents[i];
+                currentIndex++;
+        }
+        for (uint i = 0; i < adminEvents.length; i++) {
+            allEvents[currentIndex] = adminEvents[i];
+            currentIndex++;
+        }
+        return allEvents;
     }
 
     function getAllMemberEvents() public view returns (CalendarEvent[] memory) {
@@ -334,8 +360,8 @@ contract CalendarDailyTelos is AccessControl {
     }
 
     function createEvent(string memory title, uint startTime, uint endTime, string memory metadataURI, address[] memory invitees) public {
-        if (!hasRole(MEMBER_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender)) {
-            _setupRole(GUEST_ROLE, msg.sender);
+        if (!hasRole(MEMBER_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender) && !hasRole(MEMBER_ROLE, msg.sender)) {
+            addGuest(msg.sender);
             guestCount++;
         }
         
