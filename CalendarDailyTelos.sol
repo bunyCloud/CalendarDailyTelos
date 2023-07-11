@@ -193,9 +193,27 @@ contract CalendarDailyTelos is AccessControl {
         memberCount--;
     }
 
-    function getEventById(uint eventId) public view returns (CalendarEvent memory) {
-        return eventsById[eventId];
+   function getEventById(uint eventId) public view returns (CalendarEvent memory) {
+    for (uint i = 0; i < eventCreators.length; i++) {
+        CalendarEvent[] storage events;
+        if (hasRole(MEMBER_ROLE, eventCreators[i])) {
+            events = memberEvents[eventCreators[i]];
+        } else if (hasRole(GUEST_ROLE, eventCreators[i])) {
+            events = guestEvents[eventCreators[i]];
+        } else if (hasRole(ADMIN_ROLE, eventCreators[i])) {
+            events = adminEvents[eventCreators[i]];
+        } else {
+            continue;
+        }
+        for (uint j = 0; j < events.length; j++) {
+            if (events[j].eventId == eventId) {
+                return events[j];
+            }
+        }
     }
+    revert("Event not found");
+}
+
 
     function getAdminEvents(address adminAddress) public view onlyAdmin returns (CalendarEvent[] memory) {
         return adminEvents[adminAddress];
@@ -310,23 +328,39 @@ function getInvitations(address userAddress) public view returns (uint[] memory)
     return invitation.eventIDs;
 }
   
+// Helper function to check if an address exists in an array
+function includes(address[] memory array, address element) internal pure returns (bool) {
+    for (uint i = 0; i < array.length; i++) {
+        if (array[i] == element) {
+            return true;
+        }
+    }
+    return false;
+}
+
 
     function acceptInvitation(uint eventID) public {
-        require(eventID < eventCreators.length, "Invalid event ID");
-        address eventCreator = eventCreators[eventID];
-        CalendarEvent[] storage events = userEvents[eventCreator];
-        require(eventID < events.length, "Invalid event ID for this user");
-        bool isInvited = false;
-        for (uint i = 0; i < events[eventID].invitedAttendees.length; i++) {
-            if (events[eventID].invitedAttendees[i] == msg.sender) {
-                isInvited = true;
-                break;
-            }
+    // Check if the user is a member or admin
+    require(hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender), "Only members or admins can accept invitations");
+
+    // Make sure the event ID is valid and that the user was invited to this event
+    uint[] memory invitedEvents = getInvitations(msg.sender);
+    bool isInvited = false;
+    for (uint i = 0; i < invitedEvents.length; i++) {
+        if (invitedEvents[i] == eventID) {
+            isInvited = true;
+            break;
         }
-        require(isInvited, "You are not invited to this event");
-        events[eventID].confirmedAttendees.push(msg.sender);
-        emit InvitationAccepted(eventID, msg.sender);
     }
+    require(isInvited, "You are not invited to this event");
+
+    // Confirm the attendance
+    CalendarEvent storage calendarEvent = eventsById[eventID];
+    calendarEvent.confirmedAttendees.push(msg.sender);
+    emit InvitationAccepted(eventID, msg.sender);
+}
+
+
 
     function updateEvent(uint eventID, string memory title, uint startTime, uint endTime, string memory metadataURI) public {
         require(hasRole(GUEST_ROLE, msg.sender) || hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender), "Caller is not a user, member or admin");
@@ -410,52 +444,56 @@ function getInvitations(address userAddress) public view returns (uint[] memory)
             return guestAddresses;
     }
 
-    function createEvent(string memory title, uint startTime, uint endTime, string memory metadataURI, address[] memory invitees) public {
-        if (!hasRole(MEMBER_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender) && !hasRole(GUEST_ROLE, msg.sender)) {
-            addGuest(msg.sender);
-            guestCount++;
-        }
-        
-        CalendarEvent memory newEvent;
-        newEvent.eventId = totalEvents + 1;
-        newEvent.title = title;
-        newEvent.startTime = startTime;
-        newEvent.endTime = endTime;
-        newEvent.organizer = msg.sender;
-        newEvent.created = block.timestamp;
-        newEvent.metadataURI = metadataURI;
-        newEvent.invitedAttendees = invitees;
-        newEvent.confirmedAttendees = new address[](0);
+  function createEvent(string memory title, uint startTime, uint endTime, string memory metadataURI, address[] memory invitees) public {
+    if (!hasRole(MEMBER_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender) && !hasRole(GUEST_ROLE, msg.sender)) {
+        addGuest(msg.sender);
+        guestCount++;
+    }
+    
+    CalendarEvent memory newEvent;
+    newEvent.eventId = totalEvents + 1;
+    newEvent.title = title;
+    newEvent.startTime = startTime;
+    newEvent.endTime = endTime;
+    newEvent.organizer = msg.sender;
+    newEvent.created = block.timestamp;
+    newEvent.metadataURI = metadataURI;
+    newEvent.invitedAttendees = invitees;
+    newEvent.confirmedAttendees = new address[](0);
 
-        if (hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender)) {
-            memberEvents[msg.sender].push(newEvent);
-            members[msg.sender].eventIds.push(newEvent.eventId);
-        } else {
-            userEvents[msg.sender].push(newEvent);
-            guestEvents[msg.sender].push(newEvent);
-            guests[msg.sender].eventIds.push(newEvent.eventId);
-        }
+    if (hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender)) {
+        memberEvents[msg.sender].push(newEvent);
+        members[msg.sender].eventIds.push(newEvent.eventId);
+    } else {
+        userEvents[msg.sender].push(newEvent);
+        guestEvents[msg.sender].push(newEvent);
+        guests[msg.sender].eventIds.push(newEvent.eventId);
+    }
 
-        uint eventID = newEvent.eventId;
-        totalEvents++;
+    uint eventID = newEvent.eventId;
+    totalEvents++;
 
- 
-         for (uint i = 0; i < invitees.length; i++) {
+    // Add the event creator's address to eventCreators
+    eventCreators.push(msg.sender);
+
+    for (uint i = 0; i < invitees.length; i++) {
         address invitee = invitees[i];
         eventInvitations[eventID].push(invitee);
         addInvitation(invitee, eventID);
         emit UserInvited(eventID, title, invitee);
     }
 
-        bytes32 userRole = MEMBER_ROLE;
-        if (hasRole(ADMIN_ROLE, msg.sender)) {
-            userRole = ADMIN_ROLE;
-        } else if (hasRole(GUEST_ROLE, msg.sender)) {
-            userRole = GUEST_ROLE;
-        }
-
-        emit NewEventCreated(eventID, title, msg.sender, startTime, endTime, metadataURI, block.timestamp, userRole);
+    bytes32 userRole = MEMBER_ROLE;
+    if (hasRole(ADMIN_ROLE, msg.sender)) {
+        userRole = ADMIN_ROLE;
+    } else if (hasRole(GUEST_ROLE, msg.sender)) {
+        userRole = GUEST_ROLE;
     }
+
+    emit NewEventCreated(eventID, title, msg.sender, startTime, endTime, metadataURI, block.timestamp, userRole);
+}
+
+       
 
     function deleteEvent(uint eventID) public {
         require(hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender), "Caller is not a member or admin");
