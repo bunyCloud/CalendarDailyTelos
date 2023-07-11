@@ -38,6 +38,12 @@ contract CalendarDailyTelos is AccessControl {
         uint[] eventIds;
     }
 
+    struct Invitation {
+          address userAddress;
+          uint[] eventIDs;
+    }
+
+    mapping(address => Invitation) public userInvitations;
     string public contractName = "Daily Telos Calendar V0.2";
     mapping(address => Guest) public guests;
     mapping(address => Member) public members;
@@ -129,7 +135,40 @@ contract CalendarDailyTelos is AccessControl {
         }
     }
 
-    function addGuest(address guestAddress) public onlyAdmin {
+    function addMembers(address[] memory memberAddresses) public onlyAdmin {
+    for (uint i = 0; i < memberAddresses.length; i++) {
+        address memberAddress = memberAddresses[i];
+        _setupRole(MEMBER_ROLE, memberAddress);
+        members[memberAddress] = Member({
+            addr: memberAddress,
+            eventIds: new uint[](0)
+        });
+        memberCount++;
+
+        if (!hasRole(GUEST_ROLE, memberAddress)) {
+            _setupRole(GUEST_ROLE, memberAddress);
+            guests[memberAddress] = Guest({
+                addr: memberAddress,
+                eventIds: new uint[](0)
+            });
+            guestCount++;
+        }
+
+        bool userExists = false;
+        for (uint j = 0; j < users.length; j++) {
+            if (users[j] == memberAddress) {
+                userExists = true;
+                break;
+            }
+        }
+        if (!userExists) {
+            users.push(memberAddress);
+        }
+    }
+}
+
+
+    function addGuest(address guestAddress) public {
         _setupRole(GUEST_ROLE, guestAddress);
         guests[guestAddress] = Guest({
             addr: guestAddress,
@@ -260,6 +299,18 @@ contract CalendarDailyTelos is AccessControl {
         return allAdminEvents;
     }
 
+function addInvitation(address userAddress, uint eventID) internal {
+    Invitation storage invitation = userInvitations[userAddress];
+    invitation.userAddress = userAddress;
+    invitation.eventIDs.push(eventID);
+}
+
+function getInvitations(address userAddress) public view returns (uint[] memory) {
+    Invitation storage invitation = userInvitations[userAddress];
+    return invitation.eventIDs;
+}
+  
+
     function acceptInvitation(uint eventID) public {
         require(eventID < eventCreators.length, "Invalid event ID");
         address eventCreator = eventCreators[eventID];
@@ -360,13 +411,13 @@ contract CalendarDailyTelos is AccessControl {
     }
 
     function createEvent(string memory title, uint startTime, uint endTime, string memory metadataURI, address[] memory invitees) public {
-        if (!hasRole(MEMBER_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender) && !hasRole(MEMBER_ROLE, msg.sender)) {
+        if (!hasRole(MEMBER_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender) && !hasRole(GUEST_ROLE, msg.sender)) {
             addGuest(msg.sender);
             guestCount++;
         }
         
         CalendarEvent memory newEvent;
-        newEvent.eventId = userEvents[msg.sender].length;
+        newEvent.eventId = totalEvents + 1;
         newEvent.title = title;
         newEvent.startTime = startTime;
         newEvent.endTime = endTime;
@@ -388,10 +439,13 @@ contract CalendarDailyTelos is AccessControl {
         uint eventID = newEvent.eventId;
         totalEvents++;
 
-        for (uint i = 0; i < invitees.length; i++) {
-            eventInvitations[eventID].push(invitees[i]);
-            emit UserInvited(eventID, title, invitees[i]);
-        }
+ 
+         for (uint i = 0; i < invitees.length; i++) {
+        address invitee = invitees[i];
+        eventInvitations[eventID].push(invitee);
+        addInvitation(invitee, eventID);
+        emit UserInvited(eventID, title, invitee);
+    }
 
         bytes32 userRole = MEMBER_ROLE;
         if (hasRole(ADMIN_ROLE, msg.sender)) {
