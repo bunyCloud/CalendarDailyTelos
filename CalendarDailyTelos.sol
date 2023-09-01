@@ -8,7 +8,7 @@ import './CalendarFactory.sol';
 contract CalendarDailyTelos is AccessControl {
     
     string public calendarName;
-    address public calendarAdmin;
+    address public calendarOwner;
     
     CalendarFactory private _factory;
     
@@ -75,7 +75,7 @@ contract CalendarDailyTelos is AccessControl {
         require(bytes(_calendarName).length > 0, "Calendar name must not be empty");
         calendarName = _calendarName;
         _factory = CalendarFactory(msg.sender);
-        calendarAdmin = msg.sender;
+        calendarOwner = msg.sender;
         _setupRole(ADMIN_ROLE, msg.sender);
     }
 
