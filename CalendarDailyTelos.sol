@@ -6,18 +6,25 @@ import './CalendarFactory.sol';
 
 
 contract CalendarDailyTelos is AccessControl {
+    
     string public calendarName;
     address public calendarAdmin;
+    
     CalendarFactory private _factory;
+    
     bytes32 public constant MEMBER_ROLE = keccak256("MEMBER_ROLE");
     bytes32 public constant GUEST_ROLE = keccak256("GUEST_ROLE");
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    
     address[] public users; 
     address[] public eventCreators;
+    
     uint public totalEvents; 
     uint public adminCount;
     uint public memberCount; 
     uint public guestCount;
+    
+    mapping(address => uint) public eventCount; 
     mapping(address => Invitation) public userInvitations;
     mapping(address => Guest) public guests;
     mapping(address => Member) public members;
@@ -27,12 +34,10 @@ contract CalendarDailyTelos is AccessControl {
     mapping(address => CalendarEvent[]) public guestEvents;
     mapping(address => CalendarEvent[]) public adminEvents;
     mapping(address => CalendarEvent[]) public memberEvents; 
-    mapping(address => uint) public eventCount; 
     mapping(uint => address[]) public eventInvitations; 
+    
     event NewEventCreated(uint indexed eventID, string title, address indexed organizer, uint startTime, uint endTime, string metadataURI, uint timestamp, bytes32 role);
     
- 
-
     struct CalendarEvent {
         uint eventId; 
         string title; 
@@ -247,7 +252,6 @@ contract CalendarDailyTelos is AccessControl {
     revert("Event not found");
 }
 
-
     function getAdminEvents(address adminAddress) public view onlyAdmin returns (CalendarEvent[] memory) {
         return adminEvents[adminAddress];
     }
@@ -261,48 +265,36 @@ contract CalendarDailyTelos is AccessControl {
         return guestEvents[guestAddress];
     }
 
-function getAllEvents() public view returns (CalendarEvent[] memory) {
-    CalendarEvent[] memory memberEventsData = getAllMemberEvents();
-    CalendarEvent[] memory guestEventsData = getAllGuestEvents();
-    CalendarEvent[] memory adminEventsData = getAllAdminEvents();
-    
-    uint combinedTotalEvents = memberEventsData.length + guestEventsData.length + adminEventsData.length;
-    CalendarEvent[] memory allEvents = new CalendarEvent[](combinedTotalEvents);
-    uint currentIndex = 0;
-    
-    for (uint i = 0; i < memberEventsData.length; i++) {
-        allEvents[currentIndex] = memberEventsData[i];
-        currentIndex++;
+    function getAllEvents() public view returns (CalendarEvent[] memory) {
+        CalendarEvent[] memory memberEventsData = getAllMemberEvents();
+        CalendarEvent[] memory guestEventsData = getAllGuestEvents();
+        CalendarEvent[] memory adminEventsData = getAllAdminEvents();
+        uint combinedTotalEvents = memberEventsData.length + guestEventsData.length + adminEventsData.length;
+        CalendarEvent[] memory allEvents = new CalendarEvent[](combinedTotalEvents);
+        uint currentIndex = 0;
+        for (uint i = 0; i < memberEventsData.length; i++) {
+            allEvents[currentIndex] = memberEventsData[i];
+            currentIndex++;
+        }
+        for (uint i = 0; i < guestEventsData.length; i++) {
+            allEvents[currentIndex] = guestEventsData[i];
+            currentIndex++;
+        }
+        for (uint i = 0; i < adminEventsData.length; i++) {
+            allEvents[currentIndex] = adminEventsData[i];
+            currentIndex++;
+        }
+        return allEvents;
     }
-    
-    for (uint i = 0; i < guestEventsData.length; i++) {
-        allEvents[currentIndex] = guestEventsData[i];
-        currentIndex++;
-    }
-    
-    for (uint i = 0; i < adminEventsData.length; i++) {
-        allEvents[currentIndex] = adminEventsData[i];
-        currentIndex++;
-    }
-    
-    return allEvents;
-}
 
-
-
-
- function getAllMemberEvents() public view returns (CalendarEvent[] memory) {
-    address[] memory memberAddresses = new address[](users.length);
-    uint memberCountLocal = 0; // Rename the local variable to avoid shadowing
-
-    uint totalMemberEvents = 0; // Initialize totalMemberEvents here
-
-    for (uint i = 0; i < users.length; i++) {
-        if (hasRole(MEMBER_ROLE, users[i])) {
-            memberAddresses[memberCountLocal] = users[i];
-            memberCountLocal++;
-
-            // Calculate the totalMemberEvents here
+     function getAllMemberEvents() public view returns (CalendarEvent[] memory) {
+        address[] memory memberAddresses = new address[](users.length);
+        uint memberCountLocal = 0; 
+        uint totalMemberEvents = 0; 
+        for (uint i = 0; i < users.length; i++) {
+            if (hasRole(MEMBER_ROLE, users[i])) {
+                memberAddresses[memberCountLocal] = users[i];
+                memberCountLocal++;
             totalMemberEvents += memberEvents[users[i]].length;
         }
     }
@@ -324,78 +316,70 @@ function getAllEvents() public view returns (CalendarEvent[] memory) {
    function getAllGuestEvents() public view returns (CalendarEvent[] memory) {
     uint totalGuestEvents = 0;
     address[] memory guestAddresses = new address[](users.length);
-    uint guestCountLocal = 0; // Rename the local variable to avoid shadowing
-
-    for (uint i = 0; i < users.length; i++) {
-        if (hasRole(GUEST_ROLE, users[i])) {
-            guestAddresses[guestCountLocal] = users[i];
-            guestCountLocal++;
-            totalGuestEvents += guestEvents[users[i]].length;
+    uint guestCountLocal = 0; 
+        for (uint i = 0; i < users.length; i++) {
+            if (hasRole(GUEST_ROLE, users[i])) {
+                guestAddresses[guestCountLocal] = users[i];
+                guestCountLocal++;
+                totalGuestEvents += guestEvents[users[i]].length;
+            }
         }
-    }
-
-    CalendarEvent[] memory allGuestEvents = new CalendarEvent[](totalGuestEvents);
-    uint currentIndex = 0;
-    for (uint i = 0; i < guestCountLocal; i++) {
+        CalendarEvent[] memory allGuestEvents = new CalendarEvent[](totalGuestEvents);
+        uint currentIndex = 0;
+        for (uint i = 0; i < guestCountLocal; i++) {
         for (uint j = 0; j < guestEvents[guestAddresses[i]].length; j++) {
             allGuestEvents[currentIndex] = guestEvents[guestAddresses[i]][j];
             currentIndex++;
+            }
         }
+        return allGuestEvents;
     }
-
-    return allGuestEvents;
-}
-
 
    function getAllAdminEvents() public view returns (CalendarEvent[] memory) {
-    uint totalAdminEvents = 0;
-    address[] memory adminAddresses = new address[](users.length);
-    uint adminCountLocal = 0; // Rename the local variable to avoid shadowing
-
-    for (uint i = 0; i < users.length; i++) {
-        if (hasRole(ADMIN_ROLE, users[i])) {
-            adminAddresses[adminCountLocal] = users[i];
-            adminCountLocal++;
-            totalAdminEvents += adminEvents[users[i]].length;
+        uint totalAdminEvents = 0;
+        address[] memory adminAddresses = new address[](users.length);
+        uint adminCountLocal = 0; 
+        for (uint i = 0; i < users.length; i++) {
+            if (hasRole(ADMIN_ROLE, users[i])) {
+                adminAddresses[adminCountLocal] = users[i];
+                adminCountLocal++;
+                totalAdminEvents += adminEvents[users[i]].length;
+            }
         }
-    }
-
-    CalendarEvent[] memory allAdminEvents = new CalendarEvent[](totalAdminEvents);
-    uint currentIndex = 0;
-    for (uint i = 0; i < adminCountLocal; i++) {
+        CalendarEvent[] memory allAdminEvents = new CalendarEvent[](totalAdminEvents);
+        uint currentIndex = 0;
+        for (uint i = 0; i < adminCountLocal; i++) {
         for (uint j = 0; j < adminEvents[adminAddresses[i]].length; j++) {
             allAdminEvents[currentIndex] = adminEvents[adminAddresses[i]][j];
             currentIndex++;
+            }
         }
+        return allAdminEvents;
     }
-    return allAdminEvents;
-}
 
 
-function addInvitation(address userAddress, uint eventID) internal {
-    Invitation storage invitation = userInvitations[userAddress];
-    invitation.userAddress = userAddress;
-    invitation.eventIDs.push(eventID);
-}
+    function addInvitation(address userAddress, uint eventID) internal {
+        Invitation storage invitation = userInvitations[userAddress];
+        invitation.userAddress = userAddress;
+        invitation.eventIDs.push(eventID);
+    }
 
-function getInvitations(address userAddress) public view returns (uint[] memory) {
-    Invitation storage invitation = userInvitations[userAddress];
-    return invitation.eventIDs;
-}
-  
-// Helper function to check if an address exists in an array
-function includes(address[] memory array, address element) internal pure returns (bool) {
-    for (uint i = 0; i < array.length; i++) {
+    function getInvitations(address userAddress) public view returns (uint[] memory) {
+        Invitation storage invitation = userInvitations[userAddress];
+        return invitation.eventIDs;
+    }
+    
+    function includes(address[] memory array, address element) internal pure returns (bool) {
+        for (uint i = 0; i < array.length; i++) {
         if (array[i] == element) {
             return true;
+            }
         }
+        return false;
     }
-    return false;
-}
 
 
     function acceptInvitation(uint eventID) public {
-    // Check if the user is a member or admin
     require(hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender), "Only members or admins can accept invitations");
     uint[] memory invitedEvents = getInvitations(msg.sender);
     bool isInvited = false;
@@ -409,8 +393,6 @@ function includes(address[] memory array, address element) internal pure returns
     CalendarEvent storage calendarEvent = eventsById[eventID];
     calendarEvent.confirmedAttendees.push(msg.sender);
     }
-
-
 
     function updateEvent(uint eventID, string memory title, uint startTime, uint endTime, string memory metadataURI) public {
         require(hasRole(GUEST_ROLE, msg.sender) || hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender), "Caller is not a user, member or admin");
@@ -432,43 +414,37 @@ function includes(address[] memory array, address element) internal pure returns
         
     }
 
-   function getAllAddresses() public view returns (address[] memory, address[] memory, address[] memory) {
-    uint adminCountLocal = 0;
-    uint memberCountLocal = 0;
-    uint guestCountLocal = 0;
-
+    function getAllAddresses() public view returns (address[] memory, address[] memory, address[] memory) {
+        uint adminCountLocal = 0;
+        uint memberCountLocal = 0;
+        uint guestCountLocal = 0;
     for (uint i = 0; i < users.length; i++) {
         if (hasRole(ADMIN_ROLE, users[i])) adminCountLocal++;
         if (hasRole(MEMBER_ROLE, users[i])) memberCountLocal++;
         if (hasRole(GUEST_ROLE, users[i])) guestCountLocal++;
+        }
+        address[] memory adminAddresses = new address[](adminCountLocal);
+        address[] memory memberAddresses = new address[](memberCountLocal);
+        address[] memory guestAddresses = new address[](guestCountLocal);
+        uint adminIndex = 0;
+        uint memberIndex = 0;
+        uint guestIndex = 0;
+        for (uint i = 0; i < users.length; i++) {
+            if (hasRole(ADMIN_ROLE, users[i])) {
+                adminAddresses[adminIndex] = users[i];
+                adminIndex++;
+        }
+            if (hasRole(MEMBER_ROLE, users[i])) {
+                memberAddresses[memberIndex] = users[i];
+                memberIndex++;
+            }
+            if (hasRole(GUEST_ROLE, users[i])) {
+                guestAddresses[guestIndex] = users[i];
+                guestIndex++;
+           }
+        }
+        return (adminAddresses, memberAddresses, guestAddresses);
     }
-
-    address[] memory adminAddresses = new address[](adminCountLocal);
-    address[] memory memberAddresses = new address[](memberCountLocal);
-    address[] memory guestAddresses = new address[](guestCountLocal);
-
-    uint adminIndex = 0;
-    uint memberIndex = 0;
-    uint guestIndex = 0;
-
-    for (uint i = 0; i < users.length; i++) {
-        if (hasRole(ADMIN_ROLE, users[i])) {
-            adminAddresses[adminIndex] = users[i];
-            adminIndex++;
-        }
-        if (hasRole(MEMBER_ROLE, users[i])) {
-            memberAddresses[memberIndex] = users[i];
-            memberIndex++;
-        }
-        if (hasRole(GUEST_ROLE, users[i])) {
-            guestAddresses[guestIndex] = users[i];
-            guestIndex++;
-        }
-    }
-
-    return (adminAddresses, memberAddresses, guestAddresses);
-}
-
 
     function getAllMemberAddresses() public view returns (address[] memory) {
         address[] memory memberAddresses = new address[](memberCount);
@@ -494,56 +470,47 @@ function includes(address[] memory array, address element) internal pure returns
             return guestAddresses;
     }
 
-  function createEvent(string memory title, uint startTime, uint endTime, string memory metadataURI, address[] memory invitees) public {
+    function createEvent(string memory title, uint startTime, uint endTime, string memory metadataURI, address[] memory invitees) public {
     require(bytes(title).length > 0, "Event title must not be empty");
     require(startTime < endTime, "Invalid event times");
-    if (!hasRole(MEMBER_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender) && !hasRole(GUEST_ROLE, msg.sender)) {
-        addGuest(msg.sender);
-        guestCount++;
-    }
-    CalendarEvent memory newEvent;
-    newEvent.eventId = totalEvents + 1;
-    newEvent.title = title;
-    newEvent.startTime = startTime;
-    newEvent.endTime = endTime;
-    newEvent.organizer = msg.sender;
-    newEvent.created = block.timestamp;
-    newEvent.metadataURI = metadataURI;
-    newEvent.invitedAttendees = invitees;
-    newEvent.confirmedAttendees = new address[](0);
-
-    if (hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender)) {
-        memberEvents[msg.sender].push(newEvent);
-        members[msg.sender].eventIds.push(newEvent.eventId);
-    } else {
-        userEvents[msg.sender].push(newEvent);
-        guestEvents[msg.sender].push(newEvent);
-        guests[msg.sender].eventIds.push(newEvent.eventId);
-    }
-
-    uint eventID = newEvent.eventId;
-    totalEvents++;
-
-    // Add the event creator's address to eventCreators
-    eventCreators.push(msg.sender);
-
-    for (uint i = 0; i < invitees.length; i++) {
+        if (!hasRole(MEMBER_ROLE, msg.sender) && !hasRole(ADMIN_ROLE, msg.sender) && !hasRole(GUEST_ROLE, msg.sender)) {
+            addGuest(msg.sender);
+            guestCount++;
+        }
+        CalendarEvent memory newEvent;
+        newEvent.eventId = totalEvents + 1;
+        newEvent.title = title;
+        newEvent.startTime = startTime;
+        newEvent.endTime = endTime;
+        newEvent.organizer = msg.sender;
+        newEvent.created = block.timestamp;
+        newEvent.metadataURI = metadataURI;
+        newEvent.invitedAttendees = invitees;
+        newEvent.confirmedAttendees = new address[](0);
+        if (hasRole(MEMBER_ROLE, msg.sender) || hasRole(ADMIN_ROLE, msg.sender)) {
+            memberEvents[msg.sender].push(newEvent);
+            members[msg.sender].eventIds.push(newEvent.eventId);
+        } else {
+            userEvents[msg.sender].push(newEvent);
+            guestEvents[msg.sender].push(newEvent);
+            guests[msg.sender].eventIds.push(newEvent.eventId);
+        }
+        uint eventID = newEvent.eventId;
+        totalEvents++;
+        eventCreators.push(msg.sender);
+        for (uint i = 0; i < invitees.length; i++) {
         address invitee = invitees[i];
         eventInvitations[eventID].push(invitee);
         addInvitation(invitee, eventID);
-    }
-
-    bytes32 userRole = MEMBER_ROLE;
-    if (hasRole(ADMIN_ROLE, msg.sender)) {
+        }
+        bytes32 userRole = MEMBER_ROLE;
+        if (hasRole(ADMIN_ROLE, msg.sender)) {
         userRole = ADMIN_ROLE;
-    } else if (hasRole(GUEST_ROLE, msg.sender)) {
+        } else if (hasRole(GUEST_ROLE, msg.sender)) {
         userRole = GUEST_ROLE;
-    }
-
-    emit NewEventCreated(eventID, title, msg.sender, startTime, endTime, metadataURI, block.timestamp, userRole);
-}
-
-       
+        }
+        emit NewEventCreated(eventID, title, msg.sender, startTime, endTime, metadataURI, block.timestamp, userRole);
+    }   
 
     function deleteEvent(uint eventID) public {
         require(hasRole(ADMIN_ROLE, msg.sender), "Caller is not a admin");
