@@ -2,6 +2,8 @@
 
 ## Solidity Contract Events
 
+- **Updated**: adminCount, memberCount, guestCount declarations shadowing existing declarations have been modified. Require statement added to createEvent function.  Removed all event emitters except for 'NewEventCreated' event emitter to reduce contract size. 
+
 - **NewEventCreated**: This event is emitted when a new event is created. It includes the new event Id, title, organizer address, start time, end time, metadata URI, the timestamp of when the event was created, and the role of the creator.
 
 *Note:* The `indexed` keyword is used for parameters in these events to allow for more efficient filtering when these events are searched for in the transaction log history.
